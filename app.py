@@ -2,6 +2,8 @@ from flask import Flask, request, jsonify
 from rapidfuzz import process
 import pandas as pd
 import re
+import requests
+import os
 
 app = Flask(__name__)
 
@@ -19,6 +21,8 @@ NUTRIENT_UNITS = {
     "fat": "g"
 }
 
+
+# nutrition stat functionality
 
 def detect_nutrient(user_input):
     nutrients = {
@@ -69,17 +73,63 @@ def match_food(user_input):
     return None
 
 
+# recipe functionality
+
+SPOONACULAR_API_KEY = "YOUR_API_KEY"
+
+def get_recipes(ingredients):
+    url = "https://api.spoonacular.com/recipes/findByIngredients"
+    params = {
+        "ingredients": ingredients,
+        "number": 3,
+        "ranking": 1,
+        "apiKey": SPOONACULAR_API_KEY
+    }
+
+    try:
+        response = requests.get(url, params=params)
+        response.raise_for_status()
+        recipes = response.json()
+        return recipes
+    except Exception as e:
+        print("[ERROR] Spoonacular API:", e)
+        return None
+
+def is_recipe_query(user_input):
+    keywords = ["recipe", "cook", "make", "dish", "meal", "dinner", "ingredients"]
+    return any(word in user_input.lower() for word in keywords)
+
+
+# routes
 
 @app.route("/", methods=["GET", "POST"])
 def home():
     if request.method == "POST":
         user_input = request.form.get("message", "").strip().lower()
+
+        if is_recipe_query(user_input):
+            ingredients = ','.join(re.findall(r'\b[a-z]+\b', user_input))
+            recipes = get_recipes(ingredients)
+            if recipes:
+                recipe_list = ''.join([
+                    f"<li><strong>{r['title']}</strong> (used: {r['usedIngredientCount']} ingredients)</li>"
+                    for r in recipes
+                ])
+                return f"""
+                    <h3>Your question:</h3>
+                    <p>{user_input}</p>
+                    <h2>Here are some recipes you can make:</h2>
+                    <ul>{recipe_list}</ul>
+                    <br><a href='/'>Ask another question</a>
+                """
+            else:
+                return "<p>Sorry, I couldn't fetch recipes right now.</p>"
+
         matched_food = match_food(user_input)
         focus_nutrient = detect_nutrient(user_input)
 
         if matched_food:
             row = nutrition_df[nutrition_df['food'] == matched_food].iloc[0]
-
             nutrient_highlight = ""
             if focus_nutrient and focus_nutrient in row:
                 value = row[focus_nutrient]
@@ -89,7 +139,7 @@ def home():
             return f"""
                 <h3>Your question:</h3>
                 <p>{user_input}</p>
-                {nutrient_highlight if nutrient_highlight else ''}
+                {nutrient_highlight}
                 <h4>Full Nutrition Facts for '{matched_food.title()}'</h4>
                 <ul>
                     <li><strong>Calories:</strong> {row['calories']} kcal</li>
@@ -100,18 +150,16 @@ def home():
                 <br><a href='/'>Ask another question</a>
             """
 
-
         return "<p>Food not found. <a href='/'>Try again</a></p>"
 
     return '''
-        <h1>Nutrition Chatbot</h1>
+        <h1>Nutrition & Recipe Chatbot</h1>
         <form method="POST">
             <label>Ask a question:</label><br>
             <input type="text" name="message" size="50">
             <input type="submit" value="Submit">
         </form>
     '''
-
 
 @app.route("/chat", methods=["POST"])
 def chat():
@@ -121,19 +169,37 @@ def chat():
     if not user_message:
         return jsonify({"error": "Empty message"}), 400
 
+    if is_recipe_query(user_message):
+        ingredients = ','.join(re.findall(r'\b[a-z]+\b', user_message))
+        recipes = get_recipes(ingredients)
+        if recipes:
+            return jsonify({
+                "type": "recipe",
+                "recipes": [
+                    {"title": r["title"], "usedIngredientCount": r["usedIngredientCount"]}
+                    for r in recipes
+                ]
+            })
+        else:
+            return jsonify({"error": "Failed to fetch recipes."}), 500
+
     matched_food = match_food(user_message)
+    focus_nutrient = detect_nutrient(user_message)
+
     if matched_food:
         row = nutrition_df[nutrition_df['food'] == matched_food].iloc[0]
         response = {
             "food": matched_food.title(),
-            "calories": row["calories"],
-            "protein": row["protein"],
-            "carbohydrates": row["carbohydrates"],
-            "fat": row["fat"]
+            "calories": f"{row['calories']} kcal",
+            "protein": f"{row['protein']} g",
+            "carbohydrates": f"{row['carbohydrates']} g",
+            "fat": f"{row['fat']} g"
         }
+        if focus_nutrient and focus_nutrient in row:
+            response["highlight"] = f"{focus_nutrient.title()}: {row[focus_nutrient]} {NUTRIENT_UNITS[focus_nutrient]}"
         return jsonify(response)
 
-    return jsonify({"error": "Food not found in database"}), 404
+    return jsonify({"error": "Food not found."}), 404
 
 
 if __name__ == "__main__":
