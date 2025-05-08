@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Chatbot Results</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <h3>Your question:</h3>
+    <p>{{ question }}</p>
+
+    {% if highlight %}
+        <h2 class="highlight">{{ highlight }}</h2>
+    {% endif %}
+
+    {% if recipes %}
+        <h4>Here are some recipes you can make:</h4>
+        <ul>
+            {% for r in recipes %}
+                <li>
+                    <a href="https://spoonacular.com/recipes/{{ r.title|replace(' ', '-')|lower }}-{{ r.id }}"
+                       target="_blank" rel="noopener noreferrer">
+                        {{ r.title }}
+                    </a>
+                    (used {{ r.usedIngredientCount }} ingredients)
+                </li>
+            {% endfor %}
+        </ul>
+    {% elif food and (not highlight or "not found" not in highlight|lower) %}
+        <h4>Full Nutrition Facts for '{{ food }}'</h4>
+        <ul>
+            <li><strong>Calories:</strong> {{ calories }}</li>
+            <li><strong>Protein:</strong> {{ protein }}</li>
+            <li><strong>Carbohydrates:</strong> {{ carbohydrates }}</li>
+            <li><strong>Fat:</strong> {{ fat }}</li>
+        </ul>
+    {% endif %}
+
+    <br><a href="{{ url_for('home') }}">Ask another question</a>
+</body>
+</html>

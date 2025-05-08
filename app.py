@@ -1,9 +1,8 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, request, render_template, redirect, url_for
 from rapidfuzz import process
 import pandas as pd
 import re
 import requests
-import os
 
 app = Flask(__name__)
 
@@ -20,7 +19,7 @@ NUTRIENT_UNITS = {
     "carbohydrates": "g",
     "fat": "g"
 }
-
+NUTRIENT_TERMS = set(NUTRIENT_UNITS.keys())
 
 # nutrition stat functionality
 
@@ -39,35 +38,31 @@ def detect_nutrient(user_input):
     return None
 
 def match_food(user_input):
-    user_input = user_input.lower()
     stopwords = {'how', 'many', 'much', 'in', 'is', 'the', 'a', 'an', 'of', 'are', 'what', "what's"}
-
-    words = re.findall(r'\b[a-z]+\b', user_input)
-    keywords = [word for word in words if word not in stopwords]
+    words = re.findall(r'\b[a-z]+\b', user_input.lower())
+    keywords = [word for word in words if word not in stopwords and word not in NUTRIENT_TERMS]
 
     print(f"[DEBUG] Extracted: {keywords}")
 
-    # Step 1: Prioritize known food-related words
     food_candidates = [w for w in keywords if w in food_tokens]
-
     print(f"[DEBUG] Filtered food candidates: {food_candidates}")
 
     if not food_candidates:
         return None
 
-    # Step 2: Try exact match by substring first
+    # Try exact match
     for food in nutrition_df['food']:
         for word in food_candidates:
             if word in food:
                 print(f"[DEBUG] Exact match: '{word}' in '{food}'")
                 return food
 
-    # Step 3: Try fuzzy match
+    # Fuzzy fallback
     for word in food_candidates:
         result = process.extractOne(word, nutrition_df['food'].tolist(), score_cutoff=75)
         if result:
-            best_match, score, _ = result
-            print(f"[DEBUG] Fuzzy match '{word}' → '{best_match}' (score {score})")
+            best_match, _, _ = result
+            print(f"[DEBUG] Fuzzy match: '{word}' → '{best_match}'")
             return best_match
 
     return None
@@ -78,6 +73,10 @@ def match_food(user_input):
 SPOONACULAR_API_KEY = "YOUR_API_KEY_HERE"
 
 def get_recipes(ingredients):
+    if not SPOONACULAR_API_KEY or SPOONACULAR_API_KEY == "YOUR_API_KEY_HERE":
+        print("[ERROR] Missing Spoonacular API key.")
+        return {"error": "API key not configured."}
+
     url = "https://api.spoonacular.com/recipes/findByIngredients"
     params = {
         "ingredients": ingredients,
@@ -89,11 +88,13 @@ def get_recipes(ingredients):
     try:
         response = requests.get(url, params=params)
         response.raise_for_status()
-        recipes = response.json()
-        return recipes
+        return response.json()
+    except requests.exceptions.HTTPError as e:
+        print("[ERROR] Spoonacular API HTTP Error:", e)
+        return {"error": "Invalid Spoonacular API key or quota exceeded."}
     except Exception as e:
         print("[ERROR] Spoonacular API:", e)
-        return None
+        return {"error": "Could not fetch recipes."}
 
 def is_recipe_query(user_input):
     keywords = ["recipe", "cook", "make", "dish", "meal", "dinner", "ingredients"]
@@ -110,56 +111,31 @@ def home():
         if is_recipe_query(user_input):
             ingredients = ','.join(re.findall(r'\b[a-z]+\b', user_input))
             recipes = get_recipes(ingredients)
-            if recipes:
-                recipe_list = ''.join([
-                    f"<li><strong>{r['title']}</strong> (used: {r['usedIngredientCount']} ingredients)</li>"
-                    for r in recipes
-                ])
-                return f"""
-                    <h3>Your question:</h3>
-                    <p>{user_input}</p>
-                    <h2>Here are some recipes you can make:</h2>
-                    <ul>{recipe_list}</ul>
-                    <br><a href='/'>Ask another question</a>
-                """
-            else:
-                return "<p>Sorry, I couldn't fetch recipes right now.</p>"
+            if isinstance(recipes, dict) and "error" in recipes:
+                return render_template("result.html", question=user_input, recipes=None, highlight=recipes["error"])
+            return render_template("result.html", question=user_input, recipes=recipes, highlight=None)
 
         matched_food = match_food(user_input)
         focus_nutrient = detect_nutrient(user_input)
 
         if matched_food:
             row = nutrition_df[nutrition_df['food'] == matched_food].iloc[0]
-            nutrient_highlight = ""
+            highlight = None
             if focus_nutrient and focus_nutrient in row:
                 value = row[focus_nutrient]
                 unit = NUTRIENT_UNITS.get(focus_nutrient, "")
-                nutrient_highlight = f"<h2>The {focus_nutrient} in <em>{matched_food.title()}</em> is <strong>{value} {unit}</strong>!</h2>"
+                highlight = f"The {focus_nutrient} in {matched_food.title()} is {value} {unit}!"
 
-            return f"""
-                <h3>Your question:</h3>
-                <p>{user_input}</p>
-                {nutrient_highlight}
-                <h4>Full Nutrition Facts for '{matched_food.title()}'</h4>
-                <ul>
-                    <li><strong>Calories:</strong> {row['calories']} kcal</li>
-                    <li><strong>Protein:</strong> {row['protein']} g</li>
-                    <li><strong>Carbohydrates:</strong> {row['carbohydrates']} g</li>
-                    <li><strong>Fat:</strong> {row['fat']} g</li>
-                </ul>
-                <br><a href='/'>Ask another question</a>
-            """
+            return render_template("result.html", question=user_input, food=matched_food.title(), highlight=highlight,
+                                   calories=f"{row['calories']} kcal",
+                                   protein=f"{row['protein']} g",
+                                   carbohydrates=f"{row['carbohydrates']} g",
+                                   fat=f"{row['fat']} g",
+                                   recipes=None)
 
-        return "<p>Food not found. <a href='/'>Try again</a></p>"
+        return render_template("result.html", question=user_input, highlight="Food not found.", recipes=None)
 
-    return '''
-        <h1>Nutrition & Recipe Chatbot</h1>
-        <form method="POST">
-            <label>Ask a question:</label><br>
-            <input type="text" name="message" size="50">
-            <input type="submit" value="Submit">
-        </form>
-    '''
+    return render_template("index.html")
 
 @app.route("/chat", methods=["POST"])
 def chat():
