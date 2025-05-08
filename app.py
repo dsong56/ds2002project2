@@ -75,7 +75,7 @@ def match_food(user_input):
 
 # recipe functionality
 
-SPOONACULAR_API_KEY = "YOUR_API_KEY"
+SPOONACULAR_API_KEY = "YOUR_API_KEY_HERE"
 
 def get_recipes(ingredients):
     url = "https://api.spoonacular.com/recipes/findByIngredients"
