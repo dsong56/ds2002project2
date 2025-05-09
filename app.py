@@ -51,14 +51,14 @@ def match_food(user_input):
     if not food_candidates:
         return None
 
-    # Try exact match
+    # try exact match
     for food in nutrition_df['food']:
         for word in food_candidates:
             if word in food:
                 print(f"[DEBUG] Exact match: '{word}' in '{food}'")
                 return food
 
-    # Fuzzy fallback
+    # fuzzy fallback
     for word in food_candidates:
         result = process.extractOne(word, nutrition_df['food'].tolist(), score_cutoff=75)
         if result:
@@ -108,15 +108,38 @@ def is_recipe_query(user_input):
 @app.route("/", methods=["GET", "POST"])
 def home():
     if request.method == "POST":
-        user_input = request.form.get("message", "").strip().lower()
+        user_input = request.form["message"]
 
         if is_recipe_query(user_input):
             ingredients = ','.join(re.findall(r'\b[a-z]+\b', user_input))
             recipes = get_recipes(ingredients)
-            if isinstance(recipes, dict) and "error" in recipes:
-                return render_template("result.html", question=user_input, recipes=None, highlight=recipes["error"])
-            return render_template("result.html", question=user_input, recipes=recipes, highlight=None)
 
+            if isinstance(recipes, dict) and "error" in recipes:
+                return render_template(
+                    "result.html",
+                    question=user_input,
+                    highlight=recipes["error"],
+                    recipes=None
+                )
+
+            recipe_data = [
+                {
+                    "title": r["title"],
+                    "id": r["id"],
+                    "image": r["image"],
+                    "usedIngredientCount": r["usedIngredientCount"]
+                }
+                for r in recipes
+            ]
+
+            return render_template(
+                "result.html",
+                question=user_input,
+                highlight=None,
+                recipes=recipe_data
+            )
+
+        # nutrition
         matched_food = match_food(user_input)
         focus_nutrient = detect_nutrient(user_input)
 
@@ -128,31 +151,28 @@ def home():
                 unit = NUTRIENT_UNITS.get(focus_nutrient, "")
                 highlight = f"The {focus_nutrient} in {matched_food.title()} is {value} {unit}!"
 
-            return render_template("result.html", question=user_input, food=matched_food.title(), highlight=highlight,
-                                   calories=f"{row['calories']} kcal",
-                                   protein=f"{row['protein']} g",
-                                   carbohydrates=f"{row['carbohydrates']} g",
-                                   fat=f"{row['fat']} g",
-                                   recipes=None)
-        
-        recipe_data = [
-            {
-                "title": r["title"],
-                "id": r["id"],
-                "image": r["image"],
-                "usedIngredientCount": r["usedIngredientCount"]
-            }
-            for r in recipes
-        ]
+            return render_template(
+                "result.html",
+                question=user_input,
+                food=matched_food.title(),
+                highlight=highlight,
+                calories=f"{row['calories']} kcal",
+                protein=f"{row['protein']} g",
+                carbohydrates=f"{row['carbohydrates']} g",
+                fat=f"{row['fat']} g",
+                recipes=None
+            )
 
+        # food not found
         return render_template(
             "result.html",
             question=user_input,
-            recipes=recipe_data,
-            highlight=None
+            highlight="Food not found.",
+            recipes=None
         )
 
     return render_template("index.html")
+
 
 @app.route("/chat", methods=["POST"])
 def chat():
@@ -193,7 +213,6 @@ def chat():
         return jsonify(response)
 
     return jsonify({"error": "Food not found."}), 404
-
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
