@@ -54,8 +54,8 @@ You can go to, powered by Google Cloud Platform:
 1. **Clone the repo**
 
 ```bash
-git clone https://github.com/your-username/your-repo.git
-cd your-repo
+git clone https://github.com/dsong56/ds2002project2.git
+cd ds2002project2
 ```
 
 2. **Install requirements**
@@ -63,7 +63,7 @@ cd your-repo
 ```bash
 python3 -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
+pip install flask pandas requests rapidfuzz
 ```
 
 3. **Set your Spoonacular API key**
