@@ -71,10 +71,11 @@ def match_food(user_input):
 
 # recipe functionality
 
-SPOONACULAR_API_KEY = os.getenv("SPOONACULAR_API_KEY")
 
 def get_recipes(ingredients):
-    if not SPOONACULAR_API_KEY or SPOONACULAR_API_KEY == "YOUR_API_KEY_HERE":
+    API_KEY = os.getenv("SPOONACULAR_API_KEY")
+
+    if not API_KEY:
         print("[ERROR] Missing Spoonacular API key.")
         return {"error": "API key not configured."}
 
@@ -83,7 +84,7 @@ def get_recipes(ingredients):
         "ingredients": ingredients,
         "number": 3,
         "ranking": 1,
-        "apiKey": SPOONACULAR_API_KEY
+        "apiKey": API_KEY
     }
 
     try:
