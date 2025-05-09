@@ -3,6 +3,7 @@ from rapidfuzz import process
 import pandas as pd
 import re
 import requests
+import os
 
 app = Flask(__name__)
 
@@ -70,7 +71,7 @@ def match_food(user_input):
 
 # recipe functionality
 
-SPOONACULAR_API_KEY = "YOUR_API_KEY_HERE"
+SPOONACULAR_API_KEY = os.getenv("SPOONACULAR_API_KEY")
 
 def get_recipes(ingredients):
     if not SPOONACULAR_API_KEY or SPOONACULAR_API_KEY == "YOUR_API_KEY_HERE":
