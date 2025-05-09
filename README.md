@@ -1,45 +1,83 @@
 # 🥗 Nutrition & Recipe Chatbot Assistant
 
-This is a Flask-based chatbot that can answer nutrition questions and suggest recipes based on ingredients.
-
-## ✅ Features
-
-- Ask nutrition questions like:  
-  - *"How much protein is in eggs?"*  
-  - *"What are the calories in almonds?"*
-- Ask for recipes using ingredients:  
-  - *"What can I cook with chicken and spinach?"*
-- Highlights specific nutrients if mentioned
-- Fetches recipes using live data from Spoonacular
-- Uses USDA nutrition data via a custom ETL pipeline
-- Clean, styled HTML interface and a `/chat` API route
-- Fully deployable on Google Cloud
+This is a Flask-based chatbot that answers nutrition questions using USDA data and suggests recipes using the Spoonacular API. It is deployed on a Google Cloud VM and publicly accessible.
 
 ---
 
-## 🧾 Data Sources
+## ✅ What This Project Does
 
-- **Nutrition dataset:**  
-  [USDA FoodData Central](https://fdc.nal.usda.gov/download-datasets)  
-  Files used: `food_nutrient.csv`, `food.csv`, `nutrient.csv`
-
-- **Recipe API:**  
-  [Spoonacular Food API](https://spoonacular.com/food-api)
+- **Nutrition Q&A:** Answers questions like "How much protein is in eggs?"
+- **Recipe Search:** Suggests recipes for questions like "What can I cook with chicken and rice?"
+- **Data Sources:**
+  - Local: `cleaned_nutrition_data.csv` (ETL-processed from USDA)
+  - Live: Spoonacular API
+- **Deployed:** Flask app is hosted on a Google Cloud VM with systemd
+- **Persistent:** Runs in background and restarts on reboot
+- **Styled:** Clean web interface using HTML, CSS, and Flask templates
+- **Two Interfaces:**
+  - `/` — interactive browser UI
+  - `/chat` — JSON API endpoint
 
 ---
 
-## 🛠️ Setup Instructions
+## 🚀 How It Works
 
-### 1. Clone the repo and install dependencies
+1. **ETL Pipeline** (via `etl.py`) merges:
+   - `food.csv`
+   - `food_nutrient.csv`
+   - `nutrient.csv`
+   → into `cleaned_nutrition_data.csv`
+
+2. **Flask App (`app.py`)**
+   - Uses fuzzy matching to detect food names
+   - Detects if user is asking about a nutrient or a recipe
+   - Loads cleaned USDA data locally
+   - Calls Spoonacular API for live recipe suggestions
+
+3. **Deployment**
+   - Hosted on GCP Compute Engine (Ubuntu VM)
+   - Flask runs with `gunicorn` under `systemd`
+   - Spoonacular API key set via environment variable in systemd config
+
+---
+
+## 🧭 How to Use It
+
+### Option A: Visit the Live App
+
+You can go to, powered by Google Cloud Platform:
+
+**http://34.86.175.178:5000/**
+
+### Option B: Run Locally
+
+1. **Clone the repo**
 
 ```bash
-pip install flask pandas requests rapidfuzz
+git clone https://github.com/your-username/your-repo.git
+cd your-repo
 ```
 
-### 2. Get a Spoonacular API Key
+2. **Install requirements**
 
-Sign up at [Spoonacular](https://spoonacular.com/food-api) and get your API key.
+```bash
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
 
-### 3. Configure your API key
+3. **Set your Spoonacular API key**
 
-You can then replace `"YOUR_API_KEY_HERE"` directly in `app.py`
+```bash
+export SPOONACULAR_API_KEY=your_key_here
+```
+
+4. **Run the app**
+
+```bash
+python app.py
+```
+
+Visit: `http://127.0.0.1:5000`
+
+---
