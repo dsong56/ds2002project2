@@ -14,17 +14,17 @@
 
     {% if recipes %}
         <h4>Here are some recipes you can make:</h4>
-        <ul>
+        <div class="recipe-grid">
             {% for r in recipes %}
-                <li>
-                    <a href="https://spoonacular.com/recipes/{{ r.title|replace(' ', '-')|lower }}-{{ r.id }}"
-                       target="_blank" rel="noopener noreferrer">
+                <div class="recipe-card">
+                    <img src="{{ r.image }}" alt="{{ r.title }}">
+                    <h5><a href="https://spoonacular.com/recipes/{{ r.title|replace(' ', '-')|lower }}-{{ r.id }}" target="_blank">
                         {{ r.title }}
-                    </a>
-                    (used {{ r.usedIngredientCount }} ingredients)
-                </li>
+                    </a></h5>
+                    <p>Uses {{ r.usedIngredientCount }} ingredients</p>
+                </div>
             {% endfor %}
-        </ul>
+        </div>
     {% elif food and (not highlight or "not found" not in highlight|lower) %}
         <h4>Full Nutrition Facts for '{{ food }}'</h4>
         <ul>

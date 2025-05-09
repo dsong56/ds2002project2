@@ -134,8 +134,23 @@ def home():
                                    carbohydrates=f"{row['carbohydrates']} g",
                                    fat=f"{row['fat']} g",
                                    recipes=None)
+        
+        recipe_data = [
+            {
+                "title": r["title"],
+                "id": r["id"],
+                "image": r["image"],
+                "usedIngredientCount": r["usedIngredientCount"]
+            }
+            for r in recipes
+        ]
 
-        return render_template("result.html", question=user_input, highlight="Food not found.", recipes=None)
+        return render_template(
+            "result.html",
+            question=user_input,
+            recipes=recipe_data,
+            highlight=None
+        )
 
     return render_template("index.html")
 
